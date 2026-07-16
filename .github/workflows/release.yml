@@ -1,0 +1,45 @@
+name: release-promotion-practice
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: |
+          TAG="release-${GITHUB_SHA::7}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Built artifact: $TAG (this is the ONLY build step, nothing rebuilds after this)"
+
+  deploy-int:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: int
+    steps:
+      - run: |
+          echo "Auto-deploying ${{ needs.build.outputs.artifact_tag }} to INT"
+          echo "No approval needed here - this step just runs."
+
+  promote-uat:
+    needs: [build, deploy-int]
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - run: |
+          echo "Promoting ${{ needs.build.outputs.artifact_tag }} to UAT"
+          echo "Same artifact tag as INT - nothing was rebuilt."
+
+  promote-prod:
+    needs: [build, promote-uat]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: |
+          echo "Promoting ${{ needs.build.outputs.artifact_tag }} to PROD"
+          echo "Same artifact tag as INT and UAT - the full journey of one immutable build."
